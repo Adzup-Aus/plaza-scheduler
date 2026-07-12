@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { api, setToken, hasToken, subscribeErrors, getErrors, clearErrors, subscribeCost, getCost } from "./lib/api.js";
+import { api, hasToken, subscribeErrors, getErrors, clearErrors, subscribeCost, getCost } from "./lib/api.js";
 import GridView from "./components/GridView.jsx";
 import TimelineView from "./components/TimelineView.jsx";
 
@@ -12,31 +12,63 @@ export default function App() {
 }
 
 function Gate({ onIn }) {
-  const [pass, setPass] = useState("");
+  const [step, setStep] = useState("email"); // email | code
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [challenge, setChallenge] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
-  const submit = async (e) => {
+
+  const sendCode = async (e) => {
     e.preventDefault();
     setBusy(true); setErr("");
     try {
-      const { token } = await api.login(pass);
-      setToken(token);
-      onIn();
-    } catch { setErr("That passcode did not work."); }
-    finally { setBusy(false); }
+      const r = await api.requestCode(email);
+      setChallenge(r.challenge);
+      setStep("code");
+    } catch (e2) {
+      setErr(e2?.data?.message || "Could not send a code to that email.");
+    } finally { setBusy(false); }
   };
+
+  const verify = async (e) => {
+    e.preventDefault();
+    setBusy(true); setErr("");
+    try {
+      await api.verifyCode(email, code.trim(), challenge);
+      onIn();
+    } catch (e2) {
+      setErr(e2?.data?.message || "That code is wrong or has expired.");
+    } finally { setBusy(false); }
+  };
+
   return (
     <div className="min-h-full grid place-items-center p-6">
-      <form onSubmit={submit} className="bg-white rounded-xl shadow-sm border border-black/10 p-6 w-full max-w-sm">
-        <h1 className="font-head text-xl text-plaza-bluish mb-1">Plaza Works Scheduler</h1>
-        <p className="text-sm text-black/60 mb-4">Enter the office passcode.</p>
-        <input type="password" value={pass} onChange={(e) => setPass(e.target.value)}
-          className="w-full border border-black/15 rounded px-3 py-2 mb-3" placeholder="Passcode" autoFocus />
-        {err && <p className="text-sm text-plaza-maroon mb-3">{err}</p>}
-        <button disabled={busy} className="w-full bg-plaza-bluish text-white rounded py-2 font-semibold disabled:opacity-50">
-          {busy ? "Checking…" : "Enter"}
-        </button>
-      </form>
+      {step === "email" ? (
+        <form onSubmit={sendCode} className="bg-white rounded-xl shadow-sm border border-black/10 p-6 w-full max-w-sm">
+          <h1 className="font-head text-xl text-plaza-bluish mb-1">Plaza Works Scheduler</h1>
+          <p className="text-sm text-black/60 mb-4">Enter your work email and we'll send you a login code.</p>
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+            className="w-full border border-black/15 rounded px-3 py-2 mb-3" placeholder="you@plazaworks.com.au" autoFocus />
+          {err && <p className="text-sm text-plaza-maroon mb-3">{err}</p>}
+          <button disabled={busy || !email} className="w-full bg-plaza-bluish text-white rounded py-2 font-semibold disabled:opacity-50">
+            {busy ? "Sending…" : "Send code"}
+          </button>
+        </form>
+      ) : (
+        <form onSubmit={verify} className="bg-white rounded-xl shadow-sm border border-black/10 p-6 w-full max-w-sm">
+          <h1 className="font-head text-xl text-plaza-bluish mb-1">Enter your code</h1>
+          <p className="text-sm text-black/60 mb-4">We sent a 6-digit code to <b>{email}</b>. It expires in 10 minutes.</p>
+          <input inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value)}
+            className="w-full border border-black/15 rounded px-3 py-2 mb-3 tracking-widest text-center text-lg" placeholder="000000" autoFocus />
+          {err && <p className="text-sm text-plaza-maroon mb-3">{err}</p>}
+          <button disabled={busy || code.trim().length < 4} className="w-full bg-plaza-bluish text-white rounded py-2 font-semibold disabled:opacity-50">
+            {busy ? "Checking…" : "Verify & enter"}
+          </button>
+          <button type="button" onClick={() => { setStep("email"); setErr(""); setCode(""); }}
+            className="w-full text-xs text-black/50 mt-3 hover:underline">Use a different email</button>
+        </form>
+      )}
     </div>
   );
 }

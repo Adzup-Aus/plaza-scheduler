@@ -1,10 +1,7 @@
-// POST { passcode } -> { token }. The shared-passcode gate (phase-0 pattern).
-import { json, checkPasscode, issueToken } from "./_lib/http.js";
+// Retired: passcode login was replaced by email + one-time code
+// (see request-code.js / verify-code.js). Kept as a stub so any old client
+// call fails cleanly instead of 404.
+import { json } from "./_lib/http.js";
 
-export const handler = async (event) => {
-  if (event.httpMethod !== "POST") return json(405, { error: "method_not_allowed" });
-  let body = {};
-  try { body = JSON.parse(event.body || "{}"); } catch { return json(400, { error: "bad_json" }); }
-  if (!checkPasscode(body.passcode)) return json(401, { error: "wrong_passcode" });
-  return json(200, { token: issueToken() });
-};
+export const handler = async () =>
+  json(410, { error: "gone", message: "Passcode login has been replaced by email + code." });

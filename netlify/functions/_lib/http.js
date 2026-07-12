@@ -1,12 +1,12 @@
-// Shared HTTP helpers + the passcode gate for the mini-app (phase-0 pattern).
-// The gate is a single shared passcode (SCHEDULER_PASSCODE env). On success the
-// front end holds a signed token; every function checks it. No per-person auth
-// (that arrives at assimilation).
+// Shared HTTP helpers + auth for the mini-app.
+// Auth is email + one-time code (OTP): an approved email requests a 6-digit code,
+// which is emailed via Resend, then exchanged for a signed session token. The code
+// is verified statelessly with a signed HMAC "challenge" (no DB table for codes).
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-const PASSCODE = process.env.SCHEDULER_PASSCODE || "";
-const SECRET = process.env.SESSION_SECRET || PASSCODE || "dev-secret";
-const TOKEN_TTL_MS = 1000 * 60 * 60 * 24 * 14; // 14 days
+const SECRET = process.env.SESSION_SECRET || "dev-secret-change-me";
+const TOKEN_TTL_MS = 1000 * 60 * 60 * 24 * 14; // 14-day session
+const OTP_TTL_MS = 1000 * 60 * 10;             // 10-minute code
 
 export function json(statusCode, body) {
   return {
@@ -16,6 +16,7 @@ export function json(statusCode, body) {
   };
 }
 
+// ---- generic signed tokens ------------------------------------------------
 export function sign(payload) {
   const data = Buffer.from(JSON.stringify(payload)).toString("base64url");
   const mac = createHmac("sha256", SECRET).update(data).digest("base64url");
@@ -36,18 +37,40 @@ export function verifyToken(token) {
   return payload;
 }
 
-export function checkPasscode(input) {
-  if (!PASSCODE) return false;
-  const a = Buffer.from(String(input));
-  const b = Buffer.from(PASSCODE);
+// ---- email allowlist ------------------------------------------------------
+// SCHEDULER_ALLOWED_EMAILS: comma-separated list of approved team emails.
+export function isEmailAllowed(email) {
+  const allow = (process.env.SCHEDULER_ALLOWED_EMAILS || "")
+    .split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const e = normEmail(email);
+  return !!e && allow.includes(e);
+}
+function normEmail(email) { return String(email || "").trim().toLowerCase(); }
+
+// ---- one-time code (stateless) -------------------------------------------
+function otpHash(email, code) {
+  return createHmac("sha256", SECRET).update(`${normEmail(email)}:${code}`).digest("base64url");
+}
+// A signed challenge that binds the emailed code to the email + an expiry,
+// without ever storing the code. The client returns it with the typed code.
+export function issueOtpChallenge(email, code) {
+  return sign({ typ: "otp", email: normEmail(email), codeHash: otpHash(email, code), exp: Date.now() + OTP_TTL_MS });
+}
+export function verifyOtp(email, code, challenge) {
+  const p = verifyToken(challenge);          // checks signature + expiry
+  if (!p || p.typ !== "otp") return false;
+  if (p.email !== normEmail(email)) return false;
+  const a = Buffer.from(otpHash(email, code));
+  const b = Buffer.from(p.codeHash || "");
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-export function issueToken() {
-  return sign({ role: "office", exp: Date.now() + TOKEN_TTL_MS });
+// ---- session --------------------------------------------------------------
+export function issueSession(email) {
+  return sign({ role: "office", email: normEmail(email), exp: Date.now() + TOKEN_TTL_MS });
 }
 
-// Wrap a handler so it 401s unless a valid token is present (Authorization: Bearer …).
+// Wrap a handler so it 401s unless a valid session token is present.
 export function requireAuth(handler) {
   return async (event) => {
     const auth = event.headers?.authorization || event.headers?.Authorization || "";
@@ -56,7 +79,7 @@ export function requireAuth(handler) {
     try {
       return await handler(event);
     } catch (err) {
-      // Copyable error log (mandatory feature): return a structured, copyable error.
+      // Copyable error log (mandatory feature): structured, copyable error.
       return json(500, {
         error: "server_error",
         message: String(err?.message || err),

@@ -55,7 +55,12 @@ async function call(path, { method = "GET", body } = {}) {
 }
 
 export const api = {
-  login: (passcode) => call("login", { method: "POST", body: { passcode } }),
+  requestCode: (email) => call("request-code", { method: "POST", body: { email } }),
+  verifyCode: async (email, code, challenge) => {
+    const r = await call("verify-code", { method: "POST", body: { email, code, challenge } });
+    if (r.token) setToken(r.token);
+    return r;
+  },
   board: (from, to) => call(`board?from=${from || ""}&to=${to || ""}`),
   generate: async (payload) => { const r = await call("generate", { method: "POST", body: payload }); if (r.ok) tallyGeneration(); return r; },
   patchDay: (dayId, patch) => call("work-day", { method: "PATCH", body: { dayId, patch } }),

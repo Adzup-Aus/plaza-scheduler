@@ -33,3 +33,6 @@ disconnected during the build and the Anthropic key is not yet placed). See `DEP
 Run the migration, deploy to Netlify, set env vars (incl. Anthropic key), run the live
 end-to-end test with a real accepted-quote job, then flip the schedule `status` to
 `active`. Confirm milestone-release and trade days expose dates for apps 8a and 09.
+
+## LIVE (2026-07-12)
+Deployed to Netlify at https://plaza-scheduler.netlify.app (repo Adzup-Aus/plaza-scheduler, made public to skip the private-org Pro paywall; no secrets in code). Env vars wired (SUPABASE_URL, SUPABASE_SERVICE_KEY, ANTHROPIC_API_KEY, SCHEDULER_PASSCODE). Smoke test: gate renders, /api/board 401s cleanly (functions + service key OK). AI-generate awaits the first real accepted-quote job (Quote app not built; jobs=0, no quotes table).
