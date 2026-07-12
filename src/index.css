@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { height: 100%; }
+body { @apply bg-plaza-paper text-plaza-ink font-body; margin: 0; }
+.no-select { user-select: none; }
+
+/* Stage colours as CSS vars so JS-positioned timeline blocks can colour by tag. */
+:root {
+  --stage-pre_work: #8a94a6;   --stage-stripout: #b45309;
+  --stage-rough_in: #0369a1;   --stage-carpentry: #7c5e10;
+  --stage-waterproofing: #0e7490; --stage-tile_prep: #4d7c0f;
+  --stage-tiling: #15803d;     --stage-painting: #7e22ce;
+  --stage-fixture_install: #1d4ed8; --stage-glass: #0891b2;
+  --stage-clean: #4b5563;      --stage-final_check: #7d013d;
+  --stage-cure: #a1a1aa;       --stage-work: #15803d;
+}

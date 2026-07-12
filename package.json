@@ -1,0 +1,25 @@
+{
+  "name": "plaza-scheduler",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Plaza Works Scheduler — AI-generated day-by-day site plan on a master cross-job board.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.4",
+    "vite": "^5.3.1"
+  }
+}
