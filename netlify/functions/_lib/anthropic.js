@@ -2,11 +2,14 @@
 // SIGNALS the deterministic engine needs. The model ONLY extracts what is in scope
 // and may suggest friendly titles; it never decides trade order or cure gaps.
 //
-// Env: ANTHROPIC_API_KEY (required, server-side), ANTHROPIC_MODEL (optional).
+// Env: OPENROUTER_API_KEY (required, server-side), AI_MODEL / ANTHROPIC_MODEL (optional).
+// 17 Sep 2026: the call goes through OpenRouter (see ./ai.js); same model, same
+// message format, one bill.
 // The exact model string is env-driven so it can be set to whatever is current
 // without a code change (the daily classifier in Stage 1B uses claude-sonnet-5).
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
+import { callAI, aiConfigured } from "./ai.js";
+
+const MODEL = process.env.AI_MODEL || process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
 
 // The shape the engine consumes. Kept in one place so the prompt and the code agree.
 export const SIGNAL_KEYS = [
@@ -43,25 +46,17 @@ ${scope || "(no scope text found)"}
 }
 
 export async function extractSignals(quote, job) {
-  if (!ANTHROPIC_API_KEY) {
-    throw new Error("Missing ANTHROPIC_API_KEY (set it in Netlify env, server-side).");
+  if (!aiConfigured()) {
+    throw new Error("Missing OPENROUTER_API_KEY (set it in Netlify env, server-side).");
   }
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 500,
-      messages: [{ role: "user", content: buildPrompt(quote, job) }],
-    }),
-  });
+  const res = await callAI({
+    model: MODEL,
+    max_tokens: 500,
+    messages: [{ role: "user", content: buildPrompt(quote, job) }],
+  }, { title: "Plaza scheduler" });
   if (!res.ok) {
     const t = await res.text();
-    throw new Error(`Anthropic API ${res.status}: ${t.slice(0, 300)}`);
+    throw new Error(`AI call failed ${res.status}: ${t.slice(0, 300)}`);
   }
   const data = await res.json();
   const text = (data?.content?.[0]?.text || "").trim();
